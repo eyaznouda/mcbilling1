@@ -295,9 +295,9 @@ function IVRModal({
                   <Form.Group controlId="formUserId">
                     <Form.Label>Utilisateur</Form.Label>
                     <Form.Select
-                      name="userId"
-                      value={ivr.userId || ''}
-                      onChange={(e) => onInputChange(e, 'userId')}
+                      name="id_user"
+                      value={ivr.id_user || ''}
+                      onChange={(e) => onInputChange(e, 'id_user')}
                       required
                       className="shadow-sm"
                     >
@@ -581,11 +581,16 @@ function IvrTable() {
 
     try {
       // Validate required fields
-      const id_user = parseInt(showEditModal ? editIvr.id_user : newIvr.id_user);
-      const name = (showEditModal ? editIvr.name : newIvr.name).trim();
+      const currentIvr = showEditModal ? editIvr : newIvr;
+      console.log('Current IVR data:', currentIvr); // Debug log
+      
+      const id_user = parseInt(currentIvr.id_user);
+      const name = (currentIvr.name || '').trim();
+      
+      console.log('Parsed values - id_user:', id_user, 'name:', name); // Debug log
       
       if (isNaN(id_user) || id_user <= 0 || !name) {
-        setErrorMessage('User and Name are required');
+        setErrorMessage(`User and Name are required (id_user: ${currentIvr.id_user}, name: ${currentIvr.name})`);
         setIsSubmitting(false);
         return;
       }

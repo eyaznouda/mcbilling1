@@ -458,13 +458,18 @@ function DIDsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  
+
   // Pagination
   const pageCount = Math.ceil(filteredDids.length / ITEMS_PER_PAGE);
   const pagedDids = filteredDids.slice(
     currentPage * ITEMS_PER_PAGE,
     (currentPage + 1) * ITEMS_PER_PAGE
   );
+
+  // Handle page change
+  const handlePageChange = ({ selected }) => {
+    setCurrentPage(selected);
+  };
 
   // Fetch data
   const fetchDIDs = () => {
@@ -644,113 +649,22 @@ function DIDsPage() {
   };
 
   return (
-    <div>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        .btn-hover-effect .icon-container {
-          transition: transform 0.3s ease;
-        }
-        .btn-hover-effect:hover .icon-container {
-          transform: translateY(-2px);
-        }
-        .floating-icon {
-          animation: float 3s ease-in-out infinite;
-        }
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
-        .pulse-effect {
-          animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.4); }
-          70% { box-shadow: 0 0 0 10px rgba(13, 110, 253, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0); }
-        }
-        .elegant-table th, .elegant-table td {
-          border-top: none;
-          border-bottom: 1px solid #e9ecef;
-        }
-        .action-btn .btn-icon {
-          transition: transform 0.2s ease;
-        }
-        .action-btn:hover .btn-icon {
-          transform: scale(1.2);
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `,
-        }}
-      />
-
-      <div className="dashboard-main" style={{ marginLeft: "80px" }}>
-        <Container fluid className="px-4 py-4">
-          <Row className="justify-content-center">
-            <Col xs={12} lg={11}>
-              <Card className="shadow border-0 overflow-hidden main-card">
-                <DIDsHeader
-                  onAddClick={() => setShowAddModal(true)}
-                  dids={dids}
-                  isExporting={isExporting}
-                />
-                <Card.Body className="p-4" style={{ animation: "fadeIn 0.5s ease-in-out" }}>
-                  {errorMessage && (
-                    <Alert variant="danger" className="d-flex align-items-center mb-4 shadow-sm">
-                      <FaTimesCircle className="me-2" />
-                      {errorMessage}
-                    </Alert>
-                  )}
-                  {successMessage && (
-                    <Alert variant="success" className="d-flex align-items-center mb-4 shadow-sm">
-                      <FaCheckCircle className="me-2" />
-                      {successMessage}
-                    </Alert>
-                  )}
-
-                  <Row className="mb-4">
-                    <Col md={6} lg={4}>
-                      <SearchBar searchTerm={searchTerm} onSearchChange={(e) => setSearchTerm(e.target.value)} />
-                    </Col>
-                  </Row>
-
-                  <DIDsTable
-                    dids={pagedDids}
-                    onEdit={openEditModal}
-                    onDelete={handleDeleteDid}
-                    isLoading={isLoading}
-                  />
-
-                  <div className="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3 mt-4">
-                    <div className="text-muted small">
-                      {!isLoading && (
-                        <>
-                          <Badge bg="light" text="dark" className="me-2 shadow-sm">
-                            <span className="fw-semibold">{pagedDids.length}</span> of {filteredDids.length} DIDs
-                          </Badge>
-                          {searchTerm && (
-                            <Badge bg="light" text="dark" className="shadow-sm">
-                              Filtered from {dids.length} total
-                            </Badge>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    <PaginationSection
-                      pageCount={pageCount}
-                      onPageChange={({ selected }) => setCurrentPage(selected)}
-                      currentPage={currentPage}
-                    />
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </Container>
-      </div>
+    <div className="container-fluid py-4">
+      <Card>
+        <DIDsHeader onAddClick={() => setShowAddModal(true)} dids={pagedDids} isExporting={isExporting} />
+        <Card.Body>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <SearchBar searchTerm={searchTerm} onSearchChange={(e) => setSearchTerm(e.target.value)} />
+          </div>
+          <DIDsTable dids={pagedDids} onEdit={openEditModal} onDelete={handleDeleteDid} isLoading={isLoading} />
+          <div className="d-flex justify-content-between align-items-center mt-3">
+            <div className="text-muted">
+              Showing {currentPage * ITEMS_PER_PAGE + 1} to {Math.min((currentPage + 1) * ITEMS_PER_PAGE, filteredDids.length)} of {filteredDids.length} entries
+            </div>
+            <PaginationSection pageCount={pageCount} onPageChange={handlePageChange} currentPage={currentPage} />
+          </div>
+        </Card.Body>
+      </Card>
 
       <DIDModal
         show={showAddModal}

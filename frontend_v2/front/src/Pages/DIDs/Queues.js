@@ -138,7 +138,23 @@ function Queues() {
       total_calls: updatedQueue.total_calls || 0,
       answered: updatedQueue.answered || 0,
       // Include other fields as needed
-      name: updatedQueue.name
+      name: updatedQueue.name,
+      // Include username for user association
+      username: updatedQueue.username,
+      // Include all other relevant fields
+      ringinuse: updatedQueue.ringinuse,
+      time: updatedQueue.time,
+      timecall: updatedQueue.timecall,
+      weight: updatedQueue.weight,
+      Frequency: updatedQueue.Frequency,
+      announce: updatedQueue.announce,
+      announce_holdtime: updatedQueue.announce_holdtime,
+      announceFrequency: updatedQueue.announceFrequency,
+      join: updatedQueue.join,
+      leavewhenempty: updatedQueue.leavewhenempty,
+      max_wait_time: updatedQueue.max_wait_time,
+      maxwait: updatedQueue.maxwait,
+      ring_or_moh: updatedQueue.ring_or_moh
     };
     
     console.log('Update data being sent:', updateData);
@@ -181,11 +197,13 @@ function Queues() {
   };
 
   const handleEdit = (queue) => {
+    console.log('Original queue data for editing:', queue);
     setNewQueue({
       // Store the queue ID for the update operation
       id: queue.id,
       id_user: queue.id_user,
       name: queue.name,
+      username: queue.username, // Assurez-vous d'inclure le username
       language: queue.language,
       strategy: queue.strategy,
       ringinuse: queue.ringinuse,

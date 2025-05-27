@@ -4,8 +4,8 @@ const cors = require("cors");
 const fs = require('fs');
 const path = require('path');
 const app = express();
-const port = 5000; // Changed from 5000 to avoid port conflicts
-const {connect} = require("./config/database");
+const port = 5000;
+const connection = require("./config/dataBase");
 const routeAuth = require("./route/auth");
 const routeRestrictNumber = require("./route/client/RestrictNumber.js");
 const routeCDR=require("./route/rapport/CDRroute");
@@ -45,11 +45,11 @@ const routeRefillProviders = require("./route/Billing/RefillProviders")
 
 // Configure CORS with specific options
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'], // Allow these origins
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow these methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
-  credentials: true // Allow cookies
-}))
+  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 
 app.use(express.json())
 // Simple route to query the database
@@ -94,7 +94,12 @@ app.use("/api/admin/RefillProviders", routeRefillProviders);
 const isPortInUse = async (port) => {
   try {
     const server = require('net').createServer()
-      .once('error', () => true)
+      .once('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          return true;
+        }
+        throw err;
+      })
       .once('listening', () => {
         server.close();
         return false;
@@ -109,23 +114,49 @@ const isPortInUse = async (port) => {
 // Try to kill any process using port 5000
 const killPortProcess = async (port) => {
   try {
-    if (process.platform === 'win32') {
-      await new Promise((resolve) => {
-        exec(`taskkill /F /PID ${port}`, (error) => {
-          if (error) console.error('Error killing process:', error);
-          resolve();
-        });
+    const { exec } = require('child_process');
+    const platform = process.platform;
+    
+    if (platform === 'win32') {
+      exec(`netstat -ano | findstr :${port}`, (err, stdout) => {
+        if (err) {
+          console.error(`Error checking port ${port}:`, err);
+          return;
+        }
+        const pids = stdout.match(/LISTENING\s+(\d+)/g);
+        if (pids) {
+          pids.forEach(pid => {
+            const processId = pid.split(' ')[1];
+            exec(`taskkill /F /PID ${processId}`, (err) => {
+              if (err) {
+                console.error(`Error killing process ${processId}:`, err);
+              }
+            });
+          });
+        }
       });
     } else {
-      await new Promise((resolve) => {
-        exec(`lsof -t -i:${port} | xargs kill -9`, (error) => {
-          if (error) console.error('Error killing process:', error);
-          resolve();
-        });
+      exec(`lsof -ti :${port}`, (err, stdout) => {
+        if (err) {
+          console.error(`Error checking port ${port}:`, err);
+          return;
+        }
+        if (stdout) {
+          const pids = stdout.split('\n');
+          pids.forEach(pid => {
+            if (pid) {
+              exec(`kill -9 ${pid}`, (err) => {
+                if (err) {
+                  console.error(`Error killing process ${pid}:`, err);
+                }
+              });
+            }
+          });
+        }
       });
     }
   } catch (error) {
-    console.error('Error killing process:', error);
+    console.error('Error killing port process:', error);
   }
 };
 
@@ -138,32 +169,39 @@ if (!fs.existsSync(configDir)) {
 // Start server with retry logic
 const startServer = async () => {
   try {
-    if (await isPortInUse(port)) {
+    // Check if port is in use
+    const isPortUsed = await isPortInUse(port);
+    if (isPortUsed) {
       console.log(`Port ${port} is in use. Attempting to kill process...`);
       await killPortProcess(port);
     }
 
+    // Start the server
     const server = app.listen(port, () => {
-      console.log(`Server running on http://localhost:${port}`);
-      console.log('API Routes:');
-      console.log('- /api/admin/auth');
-      console.log('- /api/admin/voucher');
-      console.log('- /api/admin/plans');
-      console.log('- ...other routes...');
+      console.log(`Server is running on http://localhost:${port}`);
     });
 
     // Handle server errors
     server.on('error', (error) => {
       console.error('Server error:', error);
       if (error.code === 'EADDRINUSE') {
-        console.log(`Port ${port} is still in use. Restarting server...`);
-        setTimeout(startServer, 1000);
+        console.log(`Port ${port} is still in use. Retrying in 5 seconds...`);
+        setTimeout(startServer, 5000);
       }
+    });
+
+    // Graceful shutdown
+    process.on('SIGINT', () => {
+      server.close(() => {
+        console.log('Server closed successfully');
+        process.exit(0);
+      });
     });
 
   } catch (error) {
     console.error('Failed to start server:', error);
-    setTimeout(startServer, 2000);
+    // Retry after 5 seconds
+    setTimeout(startServer, 5000);
   }
 };
 

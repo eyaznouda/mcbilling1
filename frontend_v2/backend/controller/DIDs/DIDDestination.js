@@ -136,7 +136,7 @@ exports.getDIDs = async (req, res) => {
 
 // Ajouter un nouveau DID destination
 exports.add = (req, res) => {
-    const { did, username, destinationType, priority, destination } = req.body;  // Ensure 'destination' is included in the body
+    const { did, username, destinationType, priority, destination } = req.body;  
 
     // Check for missing fields
     if (!did || !username || destinationType === undefined || priority === undefined || !destination) {
@@ -174,7 +174,7 @@ exports.add = (req, res) => {
             // Insert new DID destination into the database
             const insertQuery = `
                 INSERT INTO pkg_did_destination (id_did, id_user, voip_call, destination, priority, creationdate, secondusedreal)
-                VALUES (?, ?, ?, ?, ?, NOW(), 0)
+                VALUES (?, ?, ?, ?, ?,?,?)
             `;
 
             // Execute the query with the provided values

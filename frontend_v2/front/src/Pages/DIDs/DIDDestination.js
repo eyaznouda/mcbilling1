@@ -757,9 +757,8 @@ const App = () => {
                               <Form.Label>Call Type</Form.Label>
                               <Form.Control
                                 as="select"
-                                name="destinationType"
-                                value={newDidData.destinationType}
-                                onChange={handleInputChange}
+                                value={editingDid.destinationType}
+                                onChange={(e) => setEditingDid({...editingDid, destinationType: parseInt(e.target.value)})}
                                 className="shadow-sm"
                               >
                                 <option value="1">SIP</option>
@@ -808,6 +807,7 @@ const App = () => {
                               </Form.Control>
                             </Form.Group>
                               
+
                               <Form.Group className="mb-3">
                                 <Form.Label>Statut</Form.Label>
                                 <Form.Control

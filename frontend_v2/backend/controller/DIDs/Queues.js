@@ -87,6 +87,7 @@ exports.modifier = (req, res) => {
   // Extract fields with default values to prevent NULL values
   const { 
     id_user, 
+    name,  // Ajout du champ name
     language = 'En', 
     strategy = 'Ringall', 
     talk_time = 0, 
@@ -98,18 +99,22 @@ exports.modifier = (req, res) => {
   if (!id_user) {
     return res.status(400).json({ error: "User ID is required" });
   }
+  
+  // Log the name field to debug
+  console.log('Name field value:', name);
 
   console.log('Processed update data:', { id_user, language, strategy, talk_time, total_calls, answered });
 
   const query = `
     UPDATE pkg_queue 
-    SET id_user = ?, language = ?, strategy = ?, var_talktime = ?, var_totalcalls = ?, var_answeredCalls = ? 
+    SET id_user = ?, name = ?, language = ?, strategy = ?, var_talktime = ?, var_totalcalls = ?, var_answeredCalls = ? 
     WHERE id = ?
   `;
 
   // Ensure all values are properly converted to their expected types
   const params = [
     id_user,
+    name,  // Ajout du champ name
     language,
     strategy,
     talk_time || 0,  // Ensure these are never NULL

@@ -488,12 +488,15 @@ function VoucherPage() {
 
   // Handle edit voucher
   const handleEdit = (voucher) => {
+    console.log('Editing voucher:', voucher); // Ajoutons un log pour déboguer
+  
     // Prepare data with all fields
     const voucherData = {
       ...voucher,
+      id: voucher.id, // Assurons-nous que l'ID est bien présent
       credit: voucher.credit || '',
       plan: voucher.id_plan || '',
-      used: voucher.used || 10,
+      used: voucher.used || 0,
       language: voucher.language || 'fr',
       prefix_local: voucher.prefix_local || '',
       description: voucher.tag || '',
@@ -502,6 +505,9 @@ function VoucherPage() {
       usedate: voucher.usedate || '',
       expirationdate: voucher.expirationdate || ''
     };
+  
+    console.log('Prepared data for edit:', voucherData); // Ajoutons un log pour déboguer
+  
     setModalData(voucherData);
     setIsEditing(true);
     setShowModal(true);
@@ -516,29 +522,53 @@ function VoucherPage() {
       language: modalData.language || 'fr',
       prefix_local: modalData.prefix_local || '',
       description: modalData.description || '',
-      voucher: Math.floor(Math.random() * 999999)
+      voucher: modalData.id ? modalData.voucher : Math.floor(Math.random() * 999999)
     };
 
     try {
       // 2. Envoi direct avec gestion d'erreur améliorée
-      const res = await axios.post(
-        'http://localhost:5000/api/admin/voucher/ajouter',
-        payload,
-        { 
-          timeout: 3000,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
+      let res;
+      if (isEditing) {
+        // Pour la mise à jour, utilisons l'endpoint correct
+        res = await axios.put(
+          `http://localhost:5000/api/admin/voucher/modifier/${modalData.id}`,
+          payload,
+          { 
+            timeout: 5000, // Augmentons le timeout pour la mise à jour
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      } else {
+        // Pour l'ajout, utilisons l'endpoint existant
+        res = await axios.post(
+          'http://localhost:5000/api/admin/voucher/ajouter',
+          payload,
+          { 
+            timeout: 3000,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      }
 
       // 3. Gestion réponse
       if (res.data?.success) {
-        alert(`Voucher créé (ID: ${res.data.id})`);
+        // Utilisons setSuccessMessage au lieu de alert pour une meilleure expérience utilisateur
+        setSuccessMessage(isEditing ? `Voucher modifié avec succès (ID: ${modalData.id})` : `Voucher créé avec succès (ID: ${res.data.id})`);
+        setShowModal(false);
+        setIsEditing(false); // Réinitialisons le mode d'édition
+        await fetchData(); // Rafraîchir la liste après ajout/modification
         setModalData({
           credit: '',
           plan: '',
-          quantity: '',
           language: 'fr',
-          prefix_rules: '',
+          prefix_local: '',
+          used: '',
+          tag: '',
+          id: null,
+          voucher: '',
+          usedate: '',
+          expirationdate: '',
+          creationdate: '',
           description: ''
         });
       } else {
@@ -571,12 +601,27 @@ function VoucherPage() {
   const handleDelete = async (id) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer ce voucher?")) {
       try {
-        await axios.delete(`http://localhost:5000/api/admin/voucher/supprimer/${id}`);
-        setSuccessMessage("Voucher supprimé avec succès!");
-        fetchData();
+        // Ajoutons un timeout et des headers explicites
+        const response = await axios.delete(
+          `http://localhost:5000/api/admin/voucher/supprimer/${id}`,
+          {
+            timeout: 5000,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+        
+        // Vérifions la réponse
+        if (response.data && response.data.success) {
+          setSuccessMessage("Voucher supprimé avec succès!");
+          // Rafraîchissons les données après la suppression
+          await fetchData();
+        } else {
+          throw new Error(response.data?.error || "Erreur lors de la suppression");
+        }
       } catch (error) {
         console.error("Erreur lors de la suppression du voucher", error);
-        setError("Erreur lors de la suppression du voucher.");
+        setError(error.response?.data?.error || "Erreur lors de la suppression du voucher.");
+        setTimeout(() => setError(""), 5000);
       }
     }
   };
