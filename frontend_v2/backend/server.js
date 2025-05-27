@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const app = express();
 const port = 5000; // Changed from 5000 to avoid port conflicts
-const {connect} = require("./config/dataBase");
+const {connect} = require("./config/database");
 const routeAuth = require("./route/auth");
 const routeRestrictNumber = require("./route/client/RestrictNumber.js");
 const routeCDR=require("./route/rapport/CDRroute");
@@ -90,22 +90,43 @@ app.use("/api/admin/Offers", routeOffer);
 app.use("/api/admin/Voucher", routeVoucher);
 app.use("/api/admin/RefillProviders", routeRefillProviders);
 
-// Try to kill any process using port 5000 before starting the server
-const { exec } = require('child_process');
-
 // Function to check if a port is in use
-const isPortInUse = (port) => {
-  return new Promise((resolve) => {
+const isPortInUse = async (port) => {
+  try {
     const server = require('net').createServer()
-    server.once('error', () => {
-      resolve(true); // Port is in use
-    });
-    server.once('listening', () => {
-      server.close();
-      resolve(false); // Port is free
-    });
-    server.listen(port);
-  });
+      .once('error', () => true)
+      .once('listening', () => {
+        server.close();
+        return false;
+      })
+      .listen(port);
+    return false;
+  } catch (error) {
+    return true;
+  }
+};
+
+// Try to kill any process using port 5000
+const killPortProcess = async (port) => {
+  try {
+    if (process.platform === 'win32') {
+      await new Promise((resolve) => {
+        exec(`taskkill /F /PID ${port}`, (error) => {
+          if (error) console.error('Error killing process:', error);
+          resolve();
+        });
+      });
+    } else {
+      await new Promise((resolve) => {
+        exec(`lsof -t -i:${port} | xargs kill -9`, (error) => {
+          if (error) console.error('Error killing process:', error);
+          resolve();
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Error killing process:', error);
+  }
 };
 
 // Create a config directory if it doesn't exist
@@ -114,8 +135,37 @@ if (!fs.existsSync(configDir)) {
   fs.mkdirSync(configDir, { recursive: true });
 }
 
-// 
-app.listen(port,()=>{
-  console.log("server listening on port",port);
-  
-})
+// Start server with retry logic
+const startServer = async () => {
+  try {
+    if (await isPortInUse(port)) {
+      console.log(`Port ${port} is in use. Attempting to kill process...`);
+      await killPortProcess(port);
+    }
+
+    const server = app.listen(port, () => {
+      console.log(`Server running on http://localhost:${port}`);
+      console.log('API Routes:');
+      console.log('- /api/admin/auth');
+      console.log('- /api/admin/voucher');
+      console.log('- /api/admin/plans');
+      console.log('- ...other routes...');
+    });
+
+    // Handle server errors
+    server.on('error', (error) => {
+      console.error('Server error:', error);
+      if (error.code === 'EADDRINUSE') {
+        console.log(`Port ${port} is still in use. Restarting server...`);
+        setTimeout(startServer, 1000);
+      }
+    });
+
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    setTimeout(startServer, 2000);
+  }
+};
+
+// Start the server
+startServer();

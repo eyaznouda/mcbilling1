@@ -37,7 +37,7 @@ import SummaryDayTrunk from './Pages/Reports/SummaryDayTrunk';
 import ReportsDestination from './Pages/Reports/ReportsDestination';
 import InboundReports from './Pages/Reports/InboundReports';
 import SummaryPerUser from './Pages/Reports/SummaryPerUser';
-import CallArchive from './Pages/Reports/callArchive';
+import CallArchive from './Pages/Reports/CallArchive';
 import ActivityDash from './Pages/Dashboard/ActivityDash';
 import RechargeHistory from './Pages/Dashboard/RechargeHistory';
 import Profile from './components/UserProfile/profile';

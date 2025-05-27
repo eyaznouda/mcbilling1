@@ -27,9 +27,9 @@ const DEFAULT_VOUCHER_DATA = {
   credit: '',
   plan: '',
   language: '',
-  prefix_rules: '',
-  quantity: '',
-  description: '',
+  prefix_local: '',
+  used: '',
+  tag: '',
   id: null,
   voucher: '',
   usedate: '',
@@ -205,63 +205,53 @@ function EmptyState() {
   );
 }
 
-// Table
-function VoucherTable({ vouchers, onEdit, onDelete, isLoading, formatDate }) {
-  if (isLoading) {
-    return (
-      <div className="text-center py-5">
-        <Spinner animation="border" variant="primary" />
-        <p className="mt-3">Chargement des vouchers...</p>
-      </div>
-    );
-  }
+// Helper function to format dates
+const formatDateTime = (date) => {
+  if (!date) return '-';
+  return new Date(date).toLocaleString('fr-FR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
 
-  if (!vouchers || vouchers.length === 0) {
-    return <EmptyState />;
-  }
+// Table
+const VoucherTable = ({ vouchers, onEdit, onDelete, isLoading }) => {
+  if (!vouchers || vouchers.length === 0) return <EmptyState />;
 
   return (
-    <div className="table-responsive">
-      <Table hover className="align-middle mb-0 bg-white">
-        <thead className="bg-light">
-          <tr>
-            <th className="fw-semibold">Username</th>
-            <th className="fw-semibold">Credit</th>
-            <th className="fw-semibold">Voucher</th>
-            <th className="fw-semibold">Description</th>
-            <th className="fw-semibold">Use Date</th>
-            <th className="fw-semibold">Creation Date</th>
-            <th className="fw-semibold text-center">Actions</th>
+    <Table striped hover responsive className="mt-3">
+      <thead>
+        <tr>
+          <th>Utilisateur</th>
+          <th>Voucher</th>
+          <th>Crédit</th>
+          <th>Description</th>
+          <th>Création</th>
+          <th>Dernière Utilisation</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {vouchers.map((voucher) => (
+          <tr key={voucher.id}>
+            <td>{voucher.id_user || '-'}</td>
+            <td>{voucher.voucher}</td>
+            <td>{voucher.credit}</td>
+            <td>{voucher.tag || '-'}</td>
+            <td>{formatDateTime(voucher.creationdate)}</td>
+            <td>{formatDateTime(voucher.usedate)}</td>
+            <td>
+              <ActionButtons onEdit={() => onEdit(voucher)} onDelete={() => onDelete(voucher.id)} />
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          {vouchers.map((voucher) => (
-            <tr key={voucher.id} className="border-bottom">
-              <td>{voucher.username || '-'}</td>
-              <td>
-                <Badge bg="info" pill className="px-3 py-2">
-                  {voucher.credit?.toFixed(4) || '0.0000'}
-                </Badge>
-              </td>
-              <td>
-                <div className="fw-bold text-primary">{voucher.voucher}</div>
-              </td>
-              <td>{voucher.description || '-'}</td>
-              <td>{formatDate(voucher.usedate) || '-'}</td>
-              <td>{formatDate(voucher.creationdate) || '-'}</td>
-              <td className="table-actions">
-                <ActionButtons
-                  onEdit={() => onEdit(voucher)}
-                  onDelete={() => onDelete(voucher.id)}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-    </div>
+        ))}
+      </tbody>
+    </Table>
   );
-}
+};
 
 // Pagination
 function PaginationSection({ pageCount, onPageChange, currentPage }) {
@@ -361,24 +351,27 @@ function VoucherModal({ show, onHide, title, onSubmit, voucherData, plans, onInp
             </Col>
             <Col md={6}>
               <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Prefix Rules</Form.Label>
+                <Form.Label className="fw-semibold">Prefix Local</Form.Label>
                 <Form.Control
                   type="text"
-                  value={voucherData.prefix_rules}
-                  onChange={(e) => onInputChange({ ...voucherData, prefix_rules: e.target.value })}
+                  value={voucherData.prefix_local}
+                  onChange={(e) => onInputChange({ ...voucherData, prefix_local: e.target.value })}
                   className="shadow-sm"
                 />
+                <Form.Text className="text-muted">
+                  Format: match/replace/length
+                </Form.Text>
               </Form.Group>
             </Col>
           </Row>
           <Row>
             <Col md={6}>
               <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Quantity</Form.Label>
+                <Form.Label className="fw-semibold">Quantité</Form.Label>
                 <Form.Control
                   type="number"
-                  value={voucherData.quantity}
-                  onChange={(e) => onInputChange({ ...voucherData, quantity: e.target.value })}
+                  value={voucherData.used || 10}
+                  onChange={(e) => onInputChange({ ...voucherData, used: e.target.value })}
                   className="shadow-sm"
                 />
               </Form.Group>
@@ -446,7 +439,7 @@ function VoucherPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get("http://localhost:5000/api/admin/voucher/afficher");
+      const response = await axios.get('http://localhost:5000/api/admin/voucher/afficher');
       setData(response.data.vouchers);
       setFilteredData(response.data.vouchers);
       setSuccessMessage("Vouchers chargés avec succès");
@@ -463,7 +456,7 @@ function VoucherPage() {
   // Fetch plans from API
   const fetchPlans = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/admin/voucher/plans");
+      const response = await axios.get('http://localhost:5000/api/admin/voucher/plans');
       setPlans(response.data.plans);
     } catch (error) {
       console.error("Error fetching plans:", error);
@@ -495,7 +488,21 @@ function VoucherPage() {
 
   // Handle edit voucher
   const handleEdit = (voucher) => {
-    setModalData(voucher);
+    // Prepare data with all fields
+    const voucherData = {
+      ...voucher,
+      credit: voucher.credit || '',
+      plan: voucher.id_plan || '',
+      used: voucher.used || 10,
+      language: voucher.language || 'fr',
+      prefix_local: voucher.prefix_local || '',
+      description: voucher.tag || '',
+      voucher: voucher.voucher || '',
+      creationdate: voucher.creationdate || '',
+      usedate: voucher.usedate || '',
+      expirationdate: voucher.expirationdate || ''
+    };
+    setModalData(voucherData);
     setIsEditing(true);
     setShowModal(true);
   };
@@ -505,11 +512,11 @@ function VoucherPage() {
     const payload = {
       credit: Number(modalData.credit),
       id_plan: Number(modalData.plan),
-      used: Number(modalData.quantity || 0),
+      used: Number(modalData.used || 0),
       language: modalData.language || 'fr',
-      prefix_local: modalData.prefix_rules || '',
-      tag: modalData.description || '',
-      voucher: `VOUCH-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+      prefix_local: modalData.prefix_local || '',
+      description: modalData.description || '',
+      voucher: Math.floor(Math.random() * 999999)
     };
 
     try {

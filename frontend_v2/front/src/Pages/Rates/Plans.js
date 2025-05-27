@@ -282,19 +282,13 @@ function PlanModal({
         </Modal.Header>
         <Modal.Body>
           <Form.Group className="mb-3">
-            <Form.Label className="fw-semibold">Choisir un plan</Form.Label>
-            <Form.Select
-              value={modalData.selectedPlan}
-              onChange={(e) => onInputChange({ ...modalData, selectedPlan: e.target.value })}
+            <Form.Label className="fw-semibold">Nom</Form.Label>
+            <Form.Control
+              type="text"
+              value={modalData.name}
+              onChange={(e) => onInputChange({ ...modalData, name: e.target.value })}
               className="shadow-none"
-            >
-              <option value="">Sélectionnez un plan</option>
-              {availablePlans.map((plan) => (
-                <option key={plan.id} value={plan.id}>
-                  {plan.name}
-                </option>
-              ))}
-            </Form.Select>
+            />
           </Form.Group>
 
           <Form.Group className="mb-3">
@@ -322,11 +316,15 @@ function PlanModal({
           </Form.Group>
 
           <Form.Group className="mb-3">
-            <Form.Label className="fw-semibold">Tech prefix</Form.Label>
+            <Form.Label className="fw-semibold">Tech Prefix</Form.Label>
             <Form.Control
               type="text"
               value={modalData.techprefix}
-              onChange={(e) => onInputChange({ ...modalData, techprefix: e.target.value })}
+              onChange={(e) => {
+                // Only allow numbers
+                const value = e.target.value.replace(/[^0-9]/g, '');
+                onInputChange({ ...modalData, techprefix: value });
+              }}
               className="shadow-none"
             />
           </Form.Group>
@@ -380,6 +378,8 @@ const PlansTable = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
+  const [deleteModal, setDeleteModal] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
 
   useEffect(() => {
     fetchPlans();
@@ -468,28 +468,45 @@ const PlansTable = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce plan?")) return;
+  const handleDelete = (id) => {
+    setDeleteId(id);
+    setDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    setError("");
+    setSuccessMessage("");
     
     try {
-      await axios.delete(`http://localhost:5000/api/admin/Plans/supprimer/${id}`);
-      setSuccessMessage("Plan supprimé avec succès!");
-      // Show alert after deletion
-      alert("Plan supprimé avec succès!");
-      fetchPlans();
+      // Send the delete request with the ID in the URL
+      try {
+        await axios.delete(`http://localhost:5000/api/admin/Plans/supprimer/${deleteId}`);
+        setSuccessMessage("Plan supprimé avec succès!");
+        fetchPlans();
+      } catch (error) {
+        if (error.response && error.response.data) {
+          const { error: errorMessage, details } = error.response.data;
+          if (details && details.includes('foreign key')) {
+            setError("Ce plan ne peut pas être supprimé car il est utilisé dans d'autres enregistrements.");
+          } else {
+            setError(errorMessage || "Erreur lors de la suppression du plan.");
+          }
+        } else {
+          setError("Erreur lors de la suppression du plan.");
+        }
+        throw error; // Re-throw the error to be caught by the outer catch block
+      }
     } catch (error) {
       console.error("Erreur de suppression:", error);
       setError("Erreur lors de la suppression du plan.");
+      // Log the response data if available
+      if (error.response && error.response.data) {
+        console.error("Server error details:", error.response.data);
+      }
+    } finally {
+      setDeleteModal(false);
+      setDeleteId(null);
     }
-  };
-
-  const handleInputChange = (newData) => {
-    setModalData(newData);
-  };
-
-  // Handle page change
-  const handlePageChange = ({ selected }) => {
-    setCurrentPage(selected);
   };
 
   // Filter and paginate plans
@@ -547,18 +564,25 @@ const PlansTable = () => {
     }
   `;
 
+  const handleInputChange = (data) => {
+    setModalData(data);
+  };
+
+  const handlePageChange = ({ selected }) => {
+    setCurrentPage(selected);
+  };
+
   return (
     <div>
       <style>{customStyles}</style>
-
       <div className="dashboard-main">
         <Container fluid className="px-4 py-4">
           <Row className="justify-content-center">
             <Col xs={12} lg={11}>
               <Card className="shadow border-0 overflow-hidden main-card">
-                <PlansHeader 
-                  onAddClick={handleAdd} 
-                  plans={plans} 
+                <PlansHeader
+                  onAddClick={handleAdd}
+                  plans={plans}
                   isExporting={isExporting}
                 />
                 <Card.Body className="p-4" style={{ animation: "fadeIn 0.5s ease-in-out" }}>
@@ -577,53 +601,72 @@ const PlansTable = () => {
 
                   <Row className="mb-4">
                     <Col md={6} lg={4}>
-                      <SearchBar 
-                        searchTerm={searchTerm} 
-                        onSearchChange={(e) => setSearchTerm(e.target.value)} 
+                      <SearchBar
+                        searchTerm={searchTerm}
+                        onSearchChange={(e) => setSearchTerm(e.target.value)}
                       />
                     </Col>
                   </Row>
 
-                  <PlansTableComponent
-                    plans={pagedPlans}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    isLoading={isLoading}
-                  />
-
-                  <div className="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3 mt-4">
-                    <div className="text-muted small">
-                      {!isLoading && (
-                        <>
-                          <Badge bg="light" text="dark" className="me-2 shadow-sm">
-                            <span className="fw-semibold">{pagedPlans.length}</span> sur {filteredPlans.length}{" "}
-                            plans
-                          </Badge>
-                          {searchTerm && (
-                            <Badge bg="light" text="dark" className="shadow-sm">
-                              Filtrés de {plans.length} total
-                            </Badge>
+                  {filteredPlans.length === 0 ? (
+                    <EmptyState />
+                  ) : (
+                    <>
+                      <div className="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3 mt-4">
+                        <div className="text-muted small">
+                          {!isLoading && (
+                            <>
+                              <Badge bg="light" text="dark" className="me-2 shadow-sm">
+                                <span className="fw-semibold">{pagedPlans.length}</span> sur {filteredPlans.length} plans
+                              </Badge>
+                              {searchTerm && (
+                                <Badge bg="light" text="dark" className="shadow-sm">
+                                  Filtrés de {plans.length} total
+                                </Badge>
+                              )}
+                            </>
                           )}
-                        </>
-                      )}
-                    </div>
-                    <PaginationSection
-                      pageCount={pageCount}
-                      onPageChange={handlePageChange}
-                      currentPage={currentPage}
-                    />
-                  </div>
+                        </div>
+                        <PaginationSection
+                          pageCount={pageCount}
+                          onPageChange={handlePageChange}
+                          currentPage={currentPage}
+                        />
+                      </div>
+                      <PlansTableComponent
+                        plans={pagedPlans}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        isLoading={isLoading}
+                      />
+                    </>
+                  )}
                 </Card.Body>
               </Card>
             </Col>
           </Row>
         </Container>
       </div>
-
+      <Modal show={deleteModal} onHide={() => setDeleteModal(false)} backdrop="static">
+        <Modal.Header closeButton>
+          <Modal.Title>Confirmation</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Êtes-vous sûr de vouloir supprimer ce plan ? Cette action est irréversible.</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setDeleteModal(false)}>
+            Annuler
+          </Button>
+          <Button variant="danger" onClick={confirmDelete}>
+            Supprimer
+          </Button>
+        </Modal.Footer>
+      </Modal>
       <PlanModal
         show={showModal}
         onHide={() => setShowModal(false)}
-        title={modalData.id ? "Modifier un plan" : "Ajouter un plan"}
+        title={modalData.id ? "Modifier Plan" : "Ajouter Plan"}
         onSubmit={handleModalSubmit}
         modalData={modalData}
         availablePlans={availablePlans}

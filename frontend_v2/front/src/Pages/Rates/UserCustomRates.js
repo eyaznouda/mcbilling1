@@ -6,7 +6,6 @@ import { CSVLink } from 'react-csv';
 import ReactPaginate from 'react-paginate';
 import { FaCheckCircle, FaTimesCircle, FaEdit, FaSearch, FaDownload, FaPlusCircle, FaTrashAlt, FaFileAlt } from 'react-icons/fa';
 
-// Constants
 const ITEMS_PER_PAGE = 10;
 const API_BASE_URL = 'http://localhost:5000/api';
 
@@ -19,7 +18,6 @@ const DEFAULT_RATE_DATA = {
   billingblock: ''
 };
 
-// Header Component
 function UserRatesHeader({ onAddClick, rates, isExporting = false }) {
   const csvData = [
     ['Username', 'Prefix', 'Destination', 'Initial Rate', 'Init Block', 'Billing Block'],
@@ -81,7 +79,6 @@ function UserRatesHeader({ onAddClick, rates, isExporting = false }) {
   );
 }
 
-// Search Bar Component
 function SearchBar({ searchTerm, onSearchChange }) {
   return (
     <div className="position-relative">
@@ -97,7 +94,6 @@ function SearchBar({ searchTerm, onSearchChange }) {
   );
 }
 
-// Action Buttons Component
 function ActionButtons({ onEdit, onDelete }) {
   return (
     <div className="d-flex gap-2">
@@ -121,7 +117,6 @@ function ActionButtons({ onEdit, onDelete }) {
   );
 }
 
-// Empty State Component
 function EmptyState() {
   return (
     <tr>
@@ -136,8 +131,7 @@ function EmptyState() {
   );
 }
 
-// Rates Table Component
-function RatesTableComponent({ rates, onEdit, onDelete, isLoading }) {
+function RatesTableComponent({ rates, onEdit, onDelete, isLoading, prefixes }) {
   if (isLoading) {
     return (
       <div className="d-flex justify-content-center py-5">
@@ -161,22 +155,28 @@ function RatesTableComponent({ rates, onEdit, onDelete, isLoading }) {
       </thead>
       <tbody>
         {rates.length > 0 ? (
-          rates.map((rate) => (
-            <tr key={rate.id} className="plan-row">
-              <td>{rate.username}</td>
-              <td>{rate.prefix}</td>
-              <td>{rate.destination}</td>
-              <td>{rate.rateinitial}</td>
-              <td>{rate.initblock}</td>
-              <td>{rate.billingblock}</td>
-              <td>
-                <ActionButtons 
-                  onEdit={() => onEdit(rate)}
-                  onDelete={() => onDelete(rate.id)}
-                />
-              </td>
-            </tr>
-          ))
+          rates.map((rate) => {
+            // Find the prefix from the prefixes array to get the destination
+            const prefix = prefixes.find(p => p.id === rate.id_prefix);
+            const destination = prefix ? prefix.destination : rate.destination;
+            
+            return (
+              <tr key={rate.id} className="plan-row">
+                <td>{rate.username}</td>
+                <td>{rate.prefix}</td>
+                <td>{destination}</td>
+                <td>{rate.rateinitial}</td>
+                <td>{rate.initblock}</td>
+                <td>{rate.billingblock}</td>
+                <td>
+                  <ActionButtons 
+                    onEdit={() => onEdit(rate)}
+                    onDelete={() => onDelete(rate.id)}
+                  />
+                </td>
+              </tr>
+            );
+          })
         ) : (
           <EmptyState />
         )}
@@ -185,7 +185,6 @@ function RatesTableComponent({ rates, onEdit, onDelete, isLoading }) {
   );
 }
 
-// Pagination Component
 function PaginationSection({ pageCount, onPageChange, currentPage }) {
   return (
     <ReactPaginate
@@ -211,7 +210,6 @@ function PaginationSection({ pageCount, onPageChange, currentPage }) {
   );
 }
 
-// Rate Modal Component
 function RateModal({
   show,
   onHide,
@@ -223,6 +221,37 @@ function RateModal({
   usernames,
   prefixes
 }) {
+  const [selectedPrefix, setSelectedPrefix] = useState(modalData.id_prefix || '');
+  const [destination, setDestination] = useState('');
+
+  // Function to get destination from prefix
+  const getDestinationFromPrefix = (prefixId) => {
+    if (!prefixId || !prefixes) return '';
+    const prefix = prefixes.find(p => String(p.id) === String(prefixId));
+    return prefix ? prefix.destination : '';
+  };
+
+  useEffect(() => {
+    // Initialize destination when modal opens
+    if (modalData.id_prefix && prefixes.length > 0) {
+      const dest = getDestinationFromPrefix(modalData.id_prefix);
+      setDestination(dest);
+    }
+  }, [modalData.id_prefix, prefixes]);
+
+  const handlePrefixChange = (e) => {
+    const value = e.target.value;
+    setSelectedPrefix(value);
+    onInputChange(e);
+    
+    // Update destination immediately when prefix changes
+    const dest = getDestinationFromPrefix(value);
+    setDestination(dest);
+    onInputChange({ target: { name: 'destination', value: dest } });
+  };
+
+  // Remove the second useEffect since we're handling destination updates in handlePrefixChange
+
   return (
     <Modal show={show} onHide={onHide} centered>
       <Modal.Header closeButton>
@@ -244,7 +273,9 @@ function RateModal({
                 <option value="" disabled>Loading users...</option>
               ) : (
                 usernames.map(user => (
-                  <option key={user.id} value={user.id}>{user.username}</option>
+                  <option key={user.id} value={user.id}>
+                    {user.username}
+                  </option>
                 ))
               )}
             </Form.Select>
@@ -254,8 +285,8 @@ function RateModal({
             <Form.Label>Prefix</Form.Label>
             <Form.Select 
               name="id_prefix" 
-              value={modalData.id_prefix || ''}
-              onChange={onInputChange}
+              value={selectedPrefix}
+              onChange={handlePrefixChange}
               required
               disabled={isSubmitting}
             >
@@ -265,7 +296,7 @@ function RateModal({
               ) : (
                 prefixes.map(prefix => (
                   <option key={prefix.id} value={prefix.id}>
-                    {prefix.prefix} - {prefix.destination}
+                    {prefix.prefix}
                   </option>
                 ))
               )}
@@ -279,8 +310,8 @@ function RateModal({
                 <Form.Control
                   type="text"
                   name="destination"
-                  value={modalData.destination}
-                  onChange={onInputChange}
+                  value={destination}
+                  readOnly
                   required
                 />
               </Form.Group>
@@ -289,7 +320,7 @@ function RateModal({
               <Form.Group controlId="rateinitial">
                 <Form.Label>Initial Rate</Form.Label>
                 <Form.Control
-                  type="text"
+                  type="number"
                   name="rateinitial"
                   value={modalData.rateinitial}
                   onChange={onInputChange}
@@ -304,7 +335,7 @@ function RateModal({
               <Form.Group controlId="initblock">
                 <Form.Label>Init Block</Form.Label>
                 <Form.Control
-                  type="text"
+                  type="number"
                   name="initblock"
                   value={modalData.initblock}
                   onChange={onInputChange}
@@ -316,7 +347,7 @@ function RateModal({
               <Form.Group controlId="billingblock">
                 <Form.Label>Billing Block</Form.Label>
                 <Form.Control
-                  type="text"
+                  type="number"
                   name="billingblock"
                   value={modalData.billingblock}
                   onChange={onInputChange}
@@ -330,14 +361,14 @@ function RateModal({
             <Button variant="outline-secondary" onClick={onHide}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit" disabled={isSubmitting}>
+            <Button type="submit" variant="primary" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Spinner animation="border" size="sm" className="me-2" />
                   Saving...
                 </>
               ) : (
-                'Save Changes'
+                title.includes('Edit') ? 'Update Rate' : 'Add Rate'
               )}
             </Button>
           </div>
@@ -347,7 +378,6 @@ function RateModal({
   );
 }
 
-// Main Component
 function UserCustomRates() {
   const [userRates, setUserRates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -361,25 +391,48 @@ function UserCustomRates() {
   const [usernames, setUsernames] = useState([]);
   const [prefixes, setPrefixes] = useState([]);
 
-  const fetchUserRates = () => {
-    setLoading(true);
-    axios.get(`${API_BASE_URL}/admin/Userrate/afficher`)
-      .then((response) => {
-        setUserRates(response.data.userRates);
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error('Error fetching user rates:', error);
-        setError('Failed to fetch user rates');
-        setLoading(false);
-      });
+  useEffect(() => {
+    fetchUserRates();
+    fetchUsernames();
+    fetchPrefixes();
+  }, []);
+
+  const fetchUserRates = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_BASE_URL}/admin/Userrate/afficher`);
+      setUserRates(response.data.userRates);
+    } catch (error) {
+      console.error('Error fetching user rates:', error);
+      setError('Failed to fetch user rates');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUsernames = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/admin/Userrate/usernames`);
+      setUsernames(response.data.usernames);
+    } catch (error) {
+      console.error('Error fetching usernames:', error);
+    }
+  };
+
+  const fetchPrefixes = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/admin/Userrate/prefixes`);
+      setPrefixes(response.data.prefixes);
+    } catch (error) {
+      console.error('Error fetching prefixes:', error);
+    }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this rate?')) {
       try {
         await axios.delete(`${API_BASE_URL}/admin/Userrate/supprimer/${id}`);
-        fetchUserRates();
+        await fetchUserRates();
         setSuccessMessage('Rate deleted successfully');
         setTimeout(() => setSuccessMessage(null), 3000);
       } catch (error) {
@@ -404,22 +457,43 @@ function UserCustomRates() {
     setIsSubmitting(true);
     
     try {
+      // Ensure we have all required fields
+      if (!modalData.id_user || !modalData.id_prefix || !modalData.rateinitial || !modalData.initblock || !modalData.billingblock) {
+        setError('Please fill in all required fields: Username, Prefix, Initial Rate, Init Block, and Billing Block');
+        return;
+      }
+
+      const data = {
+        id_user: Number(modalData.id_user),
+        id_prefix: Number(modalData.id_prefix),
+        rate: Number(modalData.rateinitial),
+        initblock: Number(modalData.initblock),
+        billingblock: Number(modalData.billingblock)
+      };
+
+      console.log('Sending update data:', data);
+
+      console.log('Sending data:', data);
+
       if (modalData.id) {
-        // Update existing rate
-        await axios.put(`${API_BASE_URL}/admin/Userrate/modifier/${modalData.id}`, modalData);
+        await axios.put(`${API_BASE_URL}/admin/Userrate/modifier/${modalData.id}`, data);
         setSuccessMessage('Rate updated successfully');
       } else {
-        // Create new rate
-        await axios.post(`${API_BASE_URL}/admin/Userrate/ajouter`, modalData);
+        await axios.post(`${API_BASE_URL}/admin/Userrate/ajouter`, data)
+          .catch(error => {
+            console.error('Error details:', error.response?.data);
+            setError(error.response?.data?.error || 'Failed to save rate');
+            throw error;
+          });
         setSuccessMessage('Rate created successfully');
       }
       
-      fetchUserRates();
+      await fetchUserRates();
       setShowModal(false);
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error) {
       console.error('Error saving rate:', error);
-      setError('Failed to save rate');
+      setError(error.response?.data?.error || 'Failed to save rate');
     } finally {
       setIsSubmitting(false);
     }
@@ -434,182 +508,73 @@ function UserCustomRates() {
     setCurrentPage(selected);
   };
 
-  const fetchUsernames = async () => {
-    try {
-      console.log('Fetching usernames from:', `${API_BASE_URL}/rates/usernames`);
-      const response = await axios.get(`${API_BASE_URL}/rates/usernames`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        withCredentials: true
-      });
-      console.log('Usernames response:', response.data);
-      setUsernames(response.data.usernames || []);
-    } catch (err) {
-      console.error('Full error details:', {
-        message: err.message,
-        response: err.response,
-        config: err.config
-      });
-      setError('Failed to load usernames: ' + (err.response?.data?.message || err.message));
-    }
-  };
-
-  const fetchPrefixes = async () => {
-    try {
-      console.log('Fetching prefixes from:', `${API_BASE_URL}/rates/prefixes`);
-      const response = await axios.get(`${API_BASE_URL}/rates/prefixes`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        withCredentials: true
-      });
-      console.log('Prefixes response:', response.data);
-      setPrefixes(response.data.prefixes || []);
-    } catch (err) {
-      console.error('Full error details:', {
-        message: err.message,
-        response: err.response,
-        config: err.config
-      });
-      setError('Failed to load prefixes: ' + (err.response?.data?.message || err.message));
-    }
-  };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        await Promise.all([
-          fetchUserRates(),
-          fetchUsernames(),
-          fetchPrefixes()
-        ]);
-      } catch (error) {
-        console.error('Error loading data:', error);
-        setError('Failed to load initial data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  // Filter rates based on search term
   const filteredRates = userRates.filter(rate =>
     rate.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    rate.prefix.toString().includes(searchTerm) ||
+    rate.prefix.toLowerCase().includes(searchTerm.toLowerCase()) ||
     rate.destination.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Pagination logic
   const pageCount = Math.ceil(filteredRates.length / ITEMS_PER_PAGE);
-  const offset = currentPage * ITEMS_PER_PAGE;
-  const pagedRates = filteredRates.slice(offset, offset + ITEMS_PER_PAGE);
-
-  const customStyles = `
-    .pulse-effect {
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.7); }
-      70% { box-shadow: 0 0 0 10px rgba(13, 110, 253, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0); }
-    }
-    .btn-hover-effect .icon-container {
-      transition: all 0.3s ease;
-    }
-    .btn-hover-effect:hover .icon-container {
-      transform: translateY(-2px);
-    }
-    .action-btn .btn-icon {
-      transition: transform 0.2s ease;
-    }
-    .action-btn:hover .btn-icon {
-      transform: scale(1.2);
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .plan-row {
-      transition: all 0.2s ease;
-    }
-    .plan-row:hover {
-      background-color: rgba(13, 110, 253, 0.05);
-    }
-    .main-card {
-      border-radius: 0.5rem;
-      overflow: hidden;
-    }
-  `;
+  const currentRates = filteredRates.slice(
+    currentPage * ITEMS_PER_PAGE,
+    (currentPage + 1) * ITEMS_PER_PAGE
+  );
 
   return (
-    <div>
-      <style>{customStyles}</style>
+    <div className="container mt-4">
+      <UserRatesHeader
+        onAddClick={handleAdd}
+        rates={userRates}
+        isExporting={false}
+      />
 
-      <div className="dashboard-main">
-        <Container fluid className="px-4 py-4">
-          <Row className="justify-content-center">
-            <Col xs={12} lg={11}>
-              <Card className="shadow border-0 overflow-hidden main-card">
-                <UserRatesHeader 
-                  onAddClick={handleAdd} 
-                  rates={userRates} 
-                />
-                <Card.Body className="p-4" style={{ animation: "fadeIn 0.5s ease-in-out" }}>
-                  {error && (
-                    <Alert variant="danger" className="d-flex align-items-center mb-4 shadow-sm">
-                      <FaTimesCircle className="me-2" />
-                      {error}
-                    </Alert>
-                  )}
-                  {successMessage && (
-                    <Alert variant="success" className="d-flex align-items-center mb-4 shadow-sm">
-                      <FaCheckCircle className="me-2" />
-                      {successMessage}
-                    </Alert>
-                  )}
-
-                  <Row className="mb-4">
-                    <Col md={6} lg={4}>
-                      <SearchBar 
-                        searchTerm={searchTerm} 
-                        onSearchChange={(e) => setSearchTerm(e.target.value)} 
-                      />
-                    </Col>
-                  </Row>
-
-                  <RatesTableComponent
-                    rates={pagedRates}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    isLoading={loading}
-                  />
-
-                  <div className="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3 mt-4">
-                    <div className="text-muted small">
-                      {!loading && (
-                        <Badge bg="light" text="dark" className="me-2 shadow-sm">
-                          <span className="fw-semibold">{pagedRates.length}</span> of {filteredRates.length} rates
-                        </Badge>
-                      )}
-                    </div>
-                    <PaginationSection
-                      pageCount={pageCount}
-                      onPageChange={handlePageChange}
-                      currentPage={currentPage}
+      <Container fluid className="mt-4">
+        <Row>
+          <Col>
+            <Card>
+              <Card.Body>
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <div className="d-flex align-items-center gap-3">
+                    <SearchBar 
+                      searchTerm={searchTerm} 
+                      onSearchChange={(e) => setSearchTerm(e.target.value)} 
                     />
+                    <Badge bg="primary">
+                      Total: {userRates.length}
+                    </Badge>
                   </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </Container>
-      </div>
+                </div>
+
+                {error && (
+                  <Alert variant="danger" className="mb-4">
+                    {error}
+                  </Alert>
+                )}
+
+                {successMessage && (
+                  <Alert variant="success" className="mb-4">
+                    {successMessage}
+                  </Alert>
+                )}
+
+                <RatesTableComponent
+                  rates={currentRates}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  isLoading={loading}
+                  prefixes={prefixes}
+                />
+
+                <PaginationSection
+                  pageCount={pageCount}
+                  onPageChange={handlePageChange}
+                  currentPage={currentPage}
+                />
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
 
       <RateModal
         show={showModal}
