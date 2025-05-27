@@ -480,6 +480,7 @@ const Dashboard = () => {
                       ))}
                     </tbody>
                   </table>
+                  
                 </div>
               )}
             </Card.Body>
